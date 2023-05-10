@@ -42,6 +42,8 @@ var Shopify = new shopifyAPI({
 
 app.get("/", (req, res) => {
   res.send({ msg: "Welcome to Homepage" });
+});
+app.get("/send-mail", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
       console.log(err);
@@ -109,6 +111,13 @@ function updateProductCsv() {
   Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
     console.log(data.count);
     getProduct(data.count);
+    transporter.sendMail(mailData, function (err, info) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(info);
+      }
+    });
   });
 }
 
