@@ -3,15 +3,36 @@ const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
 const cron = require("node-cron");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
 const fs = require("fs");
 
 app.use(express.static("public"));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(cors());
+
+// create reusable transporter object using the default SMTP transport
+const transporter = nodemailer.createTransport({
+  port: 465, // true for 465, false for other ports
+  host: "smtp.gmail.com",
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.PASSWORD,
+  },
+  secure: true,
+});
+
+const mailData = {
+  from: process.env.EMAIL, // sender address
+  to: process.env.RECEIVER, // list of receivers
+  subject: "કેમ છો ભાઈ",
+  text: "",
+  html: `<b>EDFJ CSV is updated. </b>`,
+};
 
 var Shopify = new shopifyAPI({
   shop: process.env.SHOP, // MYSHOP.myshopify.com
@@ -21,6 +42,13 @@ var Shopify = new shopifyAPI({
 
 app.get("/", (req, res) => {
   res.send({ msg: "Welcome to Homepage" });
+  transporter.sendMail(mailData, function (err, info) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log(info);
+    }
+  });
 });
 
 let count = 0;
@@ -73,27 +101,21 @@ function getProduct(data_count, since_id = 0) {
     });
 }
 
-app.get("/api/products", async (req, res) => {
+// app.get("/api/products", async (req, res) => {});
+
+function updateProductCsv() {
   product_csv_data =
     "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
   Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
-    // res.send({msg: data.count});
     console.log(data.count);
-    res.send(getProduct(data.count));
+    getProduct(data.count);
   });
-  //
-  // page_info = getProduct?.link;
-});
-
-function updateProductCsv() {
-  // Shopify.get("/admin/products.json?limit=250", function (err, data, headers) {
-  //   console.log(headers); // Headers returned from request
-  //   res.send(data);
-  // });
 }
 
-cron.schedule("*/2 * * * *", () => {
-  console.log("running every 2 minutes");
+// updateProductCsv();
+
+cron.schedule("0 */4 * * *", () => {
+  console.log("running every 4 hours");
   updateProductCsv();
 });
 
