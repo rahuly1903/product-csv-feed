@@ -46,9 +46,9 @@ app.get("/", (req, res) => {
 app.get("/send-mail", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
-      console.log(err);
+      res.send({ msg: `Error in sending Mail - ${err}` });
     } else {
-      console.log(info);
+      res.send({ msg: `mail send successfully` });
     }
   });
 });
