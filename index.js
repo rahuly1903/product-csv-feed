@@ -1,7 +1,6 @@
 const express = require("express");
 const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
-const cron = require("node-cron");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 
@@ -53,81 +52,65 @@ app.get("/send-mail", (req, res) => {
   });
 });
 
-let count = 0;
+app.post("/csv-update", (req, res) => {
+  let count = 0;
+  function getProduct(data_count, since_id = 0) {
+    console.log(data_count, since_id);
+    const getProducts = new Promise((resolve, reject) => {
+      Shopify.get(
+        `/admin/products.json?limit=100&&since_id=${since_id}`,
+        function (err, data, headers) {
+          // console.log(headers); // Headers returned from request
+          if (err) return reject(err);
+          resolve({ data, headers });
+        }
+      );
+    });
 
-function getProduct(data_count, since_id = 0) {
-  console.log(data_count, since_id);
-
-  const getProducts = new Promise((resolve, reject) => {
-    Shopify.get(
-      `/admin/products.json?limit=100&&since_id=${since_id}`,
-      function (err, data, headers) {
-        // console.log(headers); // Headers returned from request
-        if (err) return reject(err);
-        resolve({ data, headers });
-      }
-    );
-  });
-
-  getProducts
-    .then(({ data }) => {
-      let since_id;
-      data.products.forEach((product) => {
-        product.variants.forEach((variant) => {
-          product_csv_data += `${variant?.sku},${variant?.id},${
-            variant?.product_id
-          },${product?.title}-${
-            variant.title
-          },"",https://www.enchantedfinejewelry.com/products/${
-            product?.handle
-          },${product?.image?.src},${
-            variant.compare_at_price === null ? 0 : variant.compare_at_price
-          },${variant?.price} USD,${variant?.inventory_quantity},${
-            variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
-          }\n`;
+    getProducts
+      .then(({ data }) => {
+        let since_id;
+        data.products.forEach((product) => {
+          product.variants.forEach((variant) => {
+            product_csv_data += `${variant?.sku},${variant?.id},${
+              variant?.product_id
+            },${product?.title}-${
+              variant.title
+            },"",https://www.enchantedfinejewelry.com/products/${
+              product?.handle
+            },${product?.image?.src},${
+              variant.compare_at_price === null ? 0 : variant.compare_at_price
+            },${variant?.price} USD,${variant?.inventory_quantity},${
+              variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
+            }\n`;
+          });
+          count++;
+          since_id = product.id;
         });
-        count++;
-        since_id = product.id;
-      });
-      fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-      console.log(count);
-      if (count <= data_count) {
-        getProduct(data_count, since_id);
-      } else {
-        return { msg: count };
-      }
-      //
-    })
-    .catch((err) => {
-      console.log(err);
-    });
-}
-
-// app.get("/api/products", async (req, res) => {});
-
-function updateProductCsv() {
-  product_csv_data =
-    "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
-  Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
-    console.log(data.count);
-    getProduct(data.count);
-    transporter.sendMail(mailData, function (err, info) {
-      if (err) {
+        fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+        console.log(count);
+        if (count <= data_count) {
+          getProduct(data_count, since_id);
+        } else {
+          res.send({ msg: `CSV updated successfully.` });
+        }
+        //
+      })
+      .catch((err) => {
         console.log(err);
-      } else {
-        console.log(info);
-      }
+      });
+  }
+
+  function updateProductCsv() {
+    product_csv_data =
+      "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
+    Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
+      console.log(data.count);
+      getProduct(data.count);
     });
-  });
-}
-
-// updateProductCsv();
-
-cron.schedule("0 */4 * * *", () => {
-  console.log("running every 4 hours");
+  }
   updateProductCsv();
 });
-
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
