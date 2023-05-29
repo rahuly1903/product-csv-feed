@@ -53,6 +53,13 @@ app.get("/send-mail", (req, res) => {
 });
 
 app.post("/csv-update", (req, res) => {
+  transporter.sendMail(mailData, function (err, info) {
+    if (err) {
+      console.log("Mail sent error");
+    } else {
+      console.log("mail send successfully");
+    }
+  });
   let count = 0;
   function getProduct(data_count, since_id = 0) {
     console.log(data_count, since_id);
