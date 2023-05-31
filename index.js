@@ -52,7 +52,7 @@ app.get("/send-mail", (req, res) => {
   });
 });
 
-app.post("/csv-update", (req, res) => {
+app.get("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
       console.log("Mail sent error");
