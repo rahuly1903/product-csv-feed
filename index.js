@@ -8,6 +8,7 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
 const fs = require("fs");
+const { error } = require("console");
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
@@ -94,11 +95,15 @@ app.get("/csv-update", (req, res) => {
           count++;
           since_id = product.id;
         });
-        fs.writeFileSync("./public/csv/products.csv", product_csv_data);
         console.log(count);
         if (count <= data_count) {
           getProduct(data_count, since_id);
         } else {
+          try {
+            fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+          } catch (e) {
+            console.log(e);
+          }
           res.send({ msg: `CSV updated successfully.` });
         }
         //
