@@ -133,7 +133,7 @@ app.get("/csv-update", (req, res) => {
         } else {
           try {
             // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-            function upload_csv_on_s3() {
+            async function upload_csv_on_s3() {
               await s3
                 .putObject({
                   Body: JSON.stringify(req.body),
