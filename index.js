@@ -79,8 +79,43 @@ app.get("/csv/products.csv", async (req, res) => {
     }
   }
 });
-
-app.get("/csv-update", (req, res) => {
+app.put("/single-csv-update", (req, res) => {
+  try {
+            // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+    const data = "rahul,yadav";
+            const upload_csv_on_s3 = new Promise((resolve, reject) => {
+              s3.putObject({
+                Body: data,
+                Bucket: process.env.BUCKET_NAME,
+                Key: process.env.FILE_NAME,
+              }).promise();
+              // if (err) {
+              //   return reject(err);
+              // }
+              console.log(1);
+              resolve({ msg: "uploaded" });
+              console.log(2);
+            });
+            upload_csv_on_s3
+              .then((obj) => {
+                console.log(obj);
+              res.send({ msg: `Single CSV updated successfully.` });
+              })
+              .catch((err) => {
+                console.log(err);
+              });
+          } catch (e) {
+            console.log(e);
+          }
+          
+        }
+        //
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+})
+app.put("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
       console.log("Mail sent error");
