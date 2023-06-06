@@ -79,7 +79,7 @@ app.get("/csv/products.csv", async (req, res) => {
     }
   }
 });
-app.put("/single-csv-update", (req, res) => {
+app.post("/single-csv-update", (req, res) => {
   try {
             // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
     const data = "rahul,yadav";
@@ -115,7 +115,7 @@ app.put("/single-csv-update", (req, res) => {
         console.log(err);
       });
 })
-app.put("/csv-update", (req, res) => {
+app.post("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
       console.log("Mail sent error");
