@@ -11,7 +11,6 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
 // const fs = require("fs");
-const { error } = require("console");
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
@@ -57,29 +56,29 @@ app.get("/send-mail", (req, res) => {
   });
 });
 
-// app.get("/products.csv", async (req, res) => {
-//   let filename = req.path.slice(1);
+app.get("/csv/products.csv", async (req, res) => {
+  let filename = req.path.slice(1);
 
-//   try {
-//     let s3File = await s3
-//       .getObject({
-//         Bucket: process.env.BUCKET_NAME,
-//         Key: process.env.FILE_NAME,
-//       })
-//       .promise();
+  try {
+    let s3File = await s3
+      .getObject({
+        Bucket: process.env.BUCKET_NAME,
+        Key: process.env.FILE_NAME,
+      })
+      .promise();
 
-//     res.set("Content-type", s3File.ContentType);
-//     res.send(s3File.Body).end();
-//   } catch (error) {
-//     if (error.code === "NoSuchKey") {
-//       console.log(`No such key ${filename}`);
-//       res.sendStatus(404).end();
-//     } else {
-//       console.log(error);
-//       res.sendStatus(500).end();
-//     }
-//   }
-// });
+    res.set("Content-type", s3File.ContentType);
+    res.send(s3File.Body).end();
+  } catch (error) {
+    if (error.code === "NoSuchKey") {
+      console.log(`No such key ${filename}`);
+      res.sendStatus(404).end();
+    } else {
+      console.log(error);
+      res.sendStatus(500).end();
+    }
+  }
+});
 
 app.get("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
@@ -116,43 +115,44 @@ app.get("/csv-update", (req, res) => {
               product?.handle
             },${product?.image?.src},${
               variant.compare_at_price === null ? 0 : variant.compare_at_price
-            },${variant?.price} USD,${variant?.inventory_quantity},${
+            } USD,${variant?.price} USD,${variant?.inventory_quantity},${
               variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
             }\n`;
+            // const data_obj = {
+            //   sku: variant?.sku,
+            //   "variant id": variant?.id,
+            // };
           });
           count++;
           since_id = product.id;
         });
         console.log(count);
         if (count <= data_count) {
+          // if (count <= 0) {
           getProduct(data_count, since_id);
         } else {
           try {
-            fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-            // const upload_csv_on_s3 = new Promise((resolve, reject) => {
-            //   s3.putObject({
-            //     Body: JSON.stringify(data, null, 2),
-            //     Bucket: process.env.BUCKET_NAME,
-            //     Key: process.env.FILE_NAME,
-            //     ContentType: "application/octet-stream",
-            //     ContentDisposition: contentDisposition(filePath, {
-            //       type: "inline",
-            //     }),
-            //   }).promise();
-            //   // if (err) {
-            //   //   return reject(err);
-            //   // }
-            //   console.log(1);
-            //   resolve({ msg: "uploaded" });
-            //   console.log(2);
-            // });
-            // upload_csv_on_s3
-            //   .then((obj) => {
-            //     console.log(obj);
-            //   })
-            //   .catch((err) => {
-            //     console.log(err);
-            //   });
+            // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+            const upload_csv_on_s3 = new Promise((resolve, reject) => {
+              s3.putObject({
+                Body: product_csv_data,
+                Bucket: process.env.BUCKET_NAME,
+                Key: process.env.FILE_NAME,
+              }).promise();
+              // if (err) {
+              //   return reject(err);
+              // }
+              console.log(1);
+              resolve({ msg: "uploaded" });
+              console.log(2);
+            });
+            upload_csv_on_s3
+              .then((obj) => {
+                console.log(obj);
+              })
+              .catch((err) => {
+                console.log(err);
+              });
           } catch (e) {
             console.log(e);
           }
