@@ -133,17 +133,27 @@ app.get("/csv-update", (req, res) => {
         } else {
           try {
             // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-            async function upload_csv_on_s3() {
-              await s3
-                .putObject({
-                  Body: JSON.stringify(req.body),
-                  Bucket: process.env.BUCKET,
-                  Key: filename,
-                })
-                .promise();
+            const upload_csv_on_s3 = new Promise((resolve, reject) => {
+              s3.putObject({
+                Body: product_csv_data,
+                Bucket: process.env.BUCKET_NAME,
+                Key: process.env.FILE_NAME,
+              }).promise();
+              // if (err) {
+              //   return reject(err);
+              // }
+              console.log(1);
+              resolve({ msg: "uploaded" });
+              console.log(2);
+            });
+            upload_csv_on_s3
+              .then((obj) => {
+                console.log(obj);
               res.send({ msg: `CSV updated successfully.` });
-            }
-            upload_csv_on_s3()
+              })
+              .catch((err) => {
+                console.log(err);
+              });
           } catch (e) {
             console.log(e);
           }
