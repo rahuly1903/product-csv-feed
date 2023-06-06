@@ -3,11 +3,14 @@ const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
+const AWS = require("aws-sdk");
+const s3 = new AWS.S3();
+const fs = require("@cyclic.sh/s3fs")(process.env.BUCKET_NAME);
 
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
-const fs = require("fs");
+// const fs = require("fs");
 const { error } = require("console");
 
 app.use(express.static("public"));
@@ -43,6 +46,7 @@ var Shopify = new shopifyAPI({
 app.get("/", (req, res) => {
   res.send({ msg: "Welcome to Homepage" });
 });
+
 app.get("/send-mail", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
@@ -53,6 +57,30 @@ app.get("/send-mail", (req, res) => {
   });
 });
 
+// app.get("/products.csv", async (req, res) => {
+//   let filename = req.path.slice(1);
+
+//   try {
+//     let s3File = await s3
+//       .getObject({
+//         Bucket: process.env.BUCKET_NAME,
+//         Key: process.env.FILE_NAME,
+//       })
+//       .promise();
+
+//     res.set("Content-type", s3File.ContentType);
+//     res.send(s3File.Body).end();
+//   } catch (error) {
+//     if (error.code === "NoSuchKey") {
+//       console.log(`No such key ${filename}`);
+//       res.sendStatus(404).end();
+//     } else {
+//       console.log(error);
+//       res.sendStatus(500).end();
+//     }
+//   }
+// });
+
 app.get("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
@@ -62,7 +90,7 @@ app.get("/csv-update", (req, res) => {
     }
   });
   let count = 0;
-  function getProduct(data_count, since_id = 0) {
+  async function getProduct(data_count, since_id = 0) {
     console.log(data_count, since_id);
     const getProducts = new Promise((resolve, reject) => {
       Shopify.get(
@@ -101,6 +129,30 @@ app.get("/csv-update", (req, res) => {
         } else {
           try {
             fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+            // const upload_csv_on_s3 = new Promise((resolve, reject) => {
+            //   s3.putObject({
+            //     Body: JSON.stringify(data, null, 2),
+            //     Bucket: process.env.BUCKET_NAME,
+            //     Key: process.env.FILE_NAME,
+            //     ContentType: "application/octet-stream",
+            //     ContentDisposition: contentDisposition(filePath, {
+            //       type: "inline",
+            //     }),
+            //   }).promise();
+            //   // if (err) {
+            //   //   return reject(err);
+            //   // }
+            //   console.log(1);
+            //   resolve({ msg: "uploaded" });
+            //   console.log(2);
+            // });
+            // upload_csv_on_s3
+            //   .then((obj) => {
+            //     console.log(obj);
+            //   })
+            //   .catch((err) => {
+            //     console.log(err);
+            //   });
           } catch (e) {
             console.log(e);
           }
