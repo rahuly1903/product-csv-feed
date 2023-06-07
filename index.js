@@ -132,10 +132,6 @@ app.post("/csv-update", (req, res) => {
             },${variant?.price} USD,${variant?.inventory_quantity},${
               variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
             }\n`;
-            // const data_obj = {
-            //   sku: variant?.sku,
-            //   "variant id": variant?.id,
-            // };
           });
           count++;
           since_id = product.id;
