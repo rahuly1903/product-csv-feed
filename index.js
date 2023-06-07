@@ -80,24 +80,36 @@ app.get("/csv/products.csv", async (req, res) => {
   }
 });
 
-app.get("/csv-update", (req, res) => {
-  transporter.sendMail(mailData, function (err, info) {
-    if (err) {
-      console.log("Mail sent error");
-    } else {
-      console.log("mail send successfully");
-    }
-  });
+app.post("/csv-single-update", function (req, res) {
+  const body = `Rahul,Yadav,2023`;
+  s3.putObject({
+    Bucket: process.env.BUCKET_NAME,
+    Body: body,
+    Key: process.env.FILE_NAME,
+  })
+    .promise()
+    .then((data) => {
+      console.log(data);
+      console.log(`Upload succeeded - `, data);
+      res.send({ msg: `CSV updated in S3 bucket successfully.` });
+    })
+    .catch((err) => {
+      console.log("Upload failed:", err);
+    });
+});
+
+app.post("/csv-update", (req, res) => {
+  const c1 = performance.now();
   let count = 0;
-  async function getProduct(data_count, since_id = 0) {
-    console.log(data_count, since_id);
+  function getProduct(data_count, since_id = 0) {
+    console.log(data_count, count, since_id);
     const getProducts = new Promise((resolve, reject) => {
       Shopify.get(
-        `/admin/products.json?limit=100&&since_id=${since_id}`,
+        `/admin/products.json?limit=250&&since_id=${since_id}`,
         function (err, data, headers) {
           // console.log(headers); // Headers returned from request
           if (err) return reject(err);
-          resolve({ data, headers });
+          resolve({ data });
         }
       );
     });
@@ -114,8 +126,10 @@ app.get("/csv-update", (req, res) => {
             },"",https://www.enchantedfinejewelry.com/products/${
               product?.handle
             },${product?.image?.src},${
-              variant.compare_at_price === null ? 0 : variant.compare_at_price
-            } USD,${variant?.price} USD,${variant?.inventory_quantity},${
+              variant.compare_at_price === null
+                ? 0
+                : variant.compare_at_price + " USD"
+            },${variant?.price} USD,${variant?.inventory_quantity},${
               variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
             }\n`;
             // const data_obj = {
@@ -126,42 +140,35 @@ app.get("/csv-update", (req, res) => {
           count++;
           since_id = product.id;
         });
-        console.log(count);
-        if (count <= data_count) {
-          // if (count <= 0) {
+        // if (count <= data_count) {
+        if (count < data_count) {
           getProduct(data_count, since_id);
         } else {
           try {
             // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-            const upload_csv_on_s3 = new Promise((resolve, reject) => {
-              s3.putObject({
-                Body: product_csv_data,
-                Bucket: process.env.BUCKET_NAME,
-                Key: process.env.FILE_NAME,
-              }).promise();
-              // if (err) {
-              //   return reject(err);
-              // }
-              console.log(1);
-              resolve({ msg: "uploaded" });
-              console.log(2);
-            });
-            upload_csv_on_s3
-              .then((obj) => {
-                console.log(obj);
+            s3.putObject({
+              Bucket: process.env.BUCKET_NAME,
+              Body: product_csv_data,
+              Key: process.env.FILE_NAME,
+            })
+              .promise()
+              .then((data) => {
+                console.log(`Upload succeeded - `, data);
+                const c2 = performance.now();
+                console.log(c2 - c1);
+                res.send({ msg: `CSV updated in S3 bucket successfully.` });
               })
               .catch((err) => {
-                console.log(err);
+                console.log("Upload failed:", err);
+                res.send({ msg: `CSV updated in S3 bucket failed.` });
               });
           } catch (e) {
-            console.log(e);
+            res.send({ msg: `Error in processing S3 bucket data.` });
           }
-          res.send({ msg: `CSV updated successfully.` });
         }
-        //
       })
       .catch((err) => {
-        console.log(err);
+        res.send({ msg: `Error in Fetching Shopify data.` });
       });
   }
 
@@ -169,7 +176,6 @@ app.get("/csv-update", (req, res) => {
     product_csv_data =
       "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
     Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
-      console.log(data.count);
       getProduct(data.count);
     });
   }
