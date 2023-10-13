@@ -127,7 +127,7 @@ app.post("/csv-update", (req, res) => {
               product?.handle
             },${product?.image?.src},${
               variant.compare_at_price === null
-                ? 0
+                ? variant?.price + " USD"
                 : variant.compare_at_price + " USD"
             },${variant?.price} USD,${variant?.inventory_quantity},${
               variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
