@@ -3,14 +3,12 @@ const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
-const AWS = require("aws-sdk");
-const s3 = new AWS.S3();
-const fs = require("@cyclic.sh/s3fs")(process.env.BUCKET_NAME);
+const path = require("path");
 
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
-// const fs = require("fs");
+const fs = require("fs");
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
@@ -45,7 +43,6 @@ var Shopify = new shopifyAPI({
 app.get("/", (req, res) => {
   res.send({ msg: "Welcome to Homepage" });
 });
-
 app.get("/send-mail", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
@@ -56,60 +53,47 @@ app.get("/send-mail", (req, res) => {
   });
 });
 
-app.get("/csv/products.csv", async (req, res) => {
-  let filename = req.path.slice(1);
-
-  try {
-    let s3File = await s3
-      .getObject({
-        Bucket: process.env.BUCKET_NAME,
-        Key: process.env.FILE_NAME,
-      })
-      .promise();
-
-    res.set("Content-type", s3File.ContentType);
-    res.send(s3File.Body).end();
-  } catch (error) {
-    if (error.code === "NoSuchKey") {
-      console.log(`No such key ${filename}`);
-      res.sendStatus(404).end();
-    } else {
-      console.log(error);
-      res.sendStatus(500).end();
+app.get("/csv/product.csv", (req, res) => {
+  const csvFilePath = "./public/csv/products.csv";
+  res.download(csvFilePath, "products.csv", (err) => {
+    if (err) {
+      console.error("Error downloading the file", err);
+      res.status(500).send("Could not download the file");
     }
-  }
+
+    // Remove the file after sending it
+    fs.unlink(csvFilePath, (err) => {
+      if (err) {
+        console.error("Error deleting the file", err);
+      }
+    });
+  });
 });
 
-app.post("/csv-single-update", function (req, res) {
+app.get("/csv-single-update", function (req, res) {
   const body = `Rahul,Yadav,2023`;
-  s3.putObject({
-    Bucket: process.env.BUCKET_NAME,
-    Body: body,
-    Key: process.env.FILE_NAME,
-  })
-    .promise()
-    .then((data) => {
-      console.log(data);
-      console.log(`Upload succeeded - `, data);
-      res.send({ msg: `CSV updated in S3 bucket successfully.` });
-    })
-    .catch((err) => {
-      console.log("Upload failed:", err);
-    });
+  fs.writeFileSync("./public/csv/products.csv", body);
+  res.send({ msg: `CSV updated successfully.` });
 });
 
 app.post("/csv-update", (req, res) => {
-  const c1 = performance.now();
+  transporter.sendMail(mailData, function (err, info) {
+    if (err) {
+      console.log("Mail sent error");
+    } else {
+      console.log("mail send successfully");
+    }
+  });
   let count = 0;
   function getProduct(data_count, since_id = 0) {
-    console.log(data_count, count, since_id);
+    console.log(data_count, since_id);
     const getProducts = new Promise((resolve, reject) => {
       Shopify.get(
-        `/admin/products.json?limit=250&&since_id=${since_id}`,
+        `/admin/products.json?limit=100&&since_id=${since_id}`,
         function (err, data, headers) {
           // console.log(headers); // Headers returned from request
           if (err) return reject(err);
-          resolve({ data });
+          resolve({ data, headers });
         }
       );
     });
@@ -126,9 +110,7 @@ app.post("/csv-update", (req, res) => {
             },"",https://www.enchantedfinejewelry.com/products/${
               product?.handle
             },${product?.image?.src},${
-              variant.compare_at_price === null
-                ? variant?.price + " USD"
-                : variant.compare_at_price + " USD"
+              variant.compare_at_price === null ? 0 : variant.compare_at_price
             },${variant?.price} USD,${variant?.inventory_quantity},${
               variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
             }\n`;
@@ -136,35 +118,21 @@ app.post("/csv-update", (req, res) => {
           count++;
           since_id = product.id;
         });
-        // if (count <= data_count) {
-        if (count < data_count) {
+        console.log(count);
+        if (count <= data_count) {
           getProduct(data_count, since_id);
         } else {
           try {
-            // fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-            s3.putObject({
-              Bucket: process.env.BUCKET_NAME,
-              Body: product_csv_data,
-              Key: process.env.FILE_NAME,
-            })
-              .promise()
-              .then((data) => {
-                console.log(`Upload succeeded - `, data);
-                const c2 = performance.now();
-                console.log(c2 - c1);
-                res.send({ msg: `CSV updated in S3 bucket successfully.` });
-              })
-              .catch((err) => {
-                console.log("Upload failed:", err);
-                res.send({ msg: `CSV updated in S3 bucket failed.` });
-              });
+            fs.writeFileSync("./public/csv/products.csv", product_csv_data);
           } catch (e) {
-            res.send({ msg: `Error in processing S3 bucket data.` });
+            console.log(e);
           }
+          res.send({ msg: `CSV updated successfully.` });
         }
+        //
       })
       .catch((err) => {
-        res.send({ msg: `Error in Fetching Shopify data.` });
+        console.log(err);
       });
   }
 
@@ -172,6 +140,7 @@ app.post("/csv-update", (req, res) => {
     product_csv_data =
       "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
     Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
+      console.log(data.count);
       getProduct(data.count);
     });
   }
