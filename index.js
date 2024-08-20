@@ -3,12 +3,13 @@ const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
-const path = require("path");
+// const path = require("path");
 
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 4000;
 const fs = require("fs");
+let product_csv_data;
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
@@ -76,6 +77,71 @@ app.get("/csv-single-update", function (req, res) {
   res.send({ msg: `CSV updated successfully.` });
 });
 
+function getProduct(count, data_count, since_id = 0) {
+  console.log(data_count, since_id);
+  const getProducts = new Promise((resolve, reject) => {
+    Shopify.get(
+      `/admin/products.json?limit=100&&since_id=${since_id}`,
+      function (err, data, headers) {
+        // console.log(headers); // Headers returned from request
+        if (err) return reject(err);
+        resolve({ data, headers });
+      }
+    );
+  });
+
+  getProducts
+    .then(({ data }) => {
+      let since_id;
+      data.products.forEach((product) => {
+        product.variants.forEach((variant) => {
+          product_csv_data += `${variant?.sku},${variant?.id},${
+            variant?.product_id
+          },${product?.title}-${
+            variant.title
+          },"",https://www.enchantedfinejewelry.com/products/${
+            product?.handle
+          },${product?.image?.src},${
+            variant.compare_at_price === null
+              ? variant?.price
+              : variant.compare_at_price
+          },${variant?.price} USD,${variant?.inventory_quantity},${
+            variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
+          }\n`;
+        });
+        count++;
+        since_id = product.id;
+      });
+      console.log(count);
+      if (count <= data_count) {
+        getProduct(data_count, since_id);
+      } else {
+        try {
+          fs.writeFileSync("./public/csv/products.csv", product_csv_data);
+        } catch (e) {
+          console.log(e);
+        }
+        res.send({ msg: `CSV updated successfully.` });
+      }
+      //
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+}
+function getAllProducts(all_product_count) {
+  let count = 0;
+  getProduct(count, all_product_count);
+}
+function updateProductCsv() {
+  product_csv_data =
+    "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
+  Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
+    console.log(data.count);
+    getAllProducts(data.count);
+  });
+}
+
 app.post("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
     if (err) {
@@ -84,66 +150,6 @@ app.post("/csv-update", (req, res) => {
       console.log("mail send successfully");
     }
   });
-  let count = 0;
-  function getProduct(data_count, since_id = 0) {
-    console.log(data_count, since_id);
-    const getProducts = new Promise((resolve, reject) => {
-      Shopify.get(
-        `/admin/products.json?limit=100&&since_id=${since_id}`,
-        function (err, data, headers) {
-          // console.log(headers); // Headers returned from request
-          if (err) return reject(err);
-          resolve({ data, headers });
-        }
-      );
-    });
-
-    getProducts
-      .then(({ data }) => {
-        let since_id;
-        data.products.forEach((product) => {
-          product.variants.forEach((variant) => {
-            product_csv_data += `${variant?.sku},${variant?.id},${
-              variant?.product_id
-            },${product?.title}-${
-              variant.title
-            },"",https://www.enchantedfinejewelry.com/products/${
-              product?.handle
-            },${product?.image?.src},${
-              variant.compare_at_price === null ? 0 : variant.compare_at_price
-            },${variant?.price} USD,${variant?.inventory_quantity},${
-              variant.inventory_quantity !== 0 ? "In Stock" : "Out of Stock"
-            }\n`;
-          });
-          count++;
-          since_id = product.id;
-        });
-        console.log(count);
-        if (count <= data_count) {
-          getProduct(data_count, since_id);
-        } else {
-          try {
-            fs.writeFileSync("./public/csv/products.csv", product_csv_data);
-          } catch (e) {
-            console.log(e);
-          }
-          res.send({ msg: `CSV updated successfully.` });
-        }
-        //
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  }
-
-  function updateProductCsv() {
-    product_csv_data =
-      "sku,variant id,product id,title,description,product url,image url,original price,sale price,quantity,quantity status\n";
-    Shopify.get(`/admin/products/count.json`, function (err, data, headers) {
-      console.log(data.count);
-      getProduct(data.count);
-    });
-  }
   updateProductCsv();
 });
 app.listen(port, () => {
