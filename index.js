@@ -2,6 +2,7 @@ const express = require("express");
 const shopifyAPI = require("shopify-node-api");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const cron = require("node-cron");
 const nodemailer = require("nodemailer");
 // const path = require("path");
 
@@ -141,6 +142,9 @@ function updateProductCsv() {
     getAllProducts(data.count);
   });
 }
+
+// Schedule the task to run every 4 hours
+cron.schedule("0 */4 * * *", updateProductCsv);
 
 app.post("/csv-update", (req, res) => {
   transporter.sendMail(mailData, function (err, info) {
