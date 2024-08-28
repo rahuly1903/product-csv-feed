@@ -31,7 +31,7 @@ const transporter = nodemailer.createTransport({
 const mailData = {
   from: process.env.EMAIL, // sender address
   to: process.env.RECEIVER, // list of receivers
-  subject: "કેમ છો ભાઈ",
+  subject: "કેમ છો ભાઈ - EDFJ CSV",
   text: "",
   html: `<b>EDFJ CSV is updated. </b>`,
 };
@@ -78,8 +78,18 @@ app.get("/csv-single-update", function (req, res) {
   res.send({ msg: `CSV updated successfully.` });
 });
 
+function cronMail() {
+  transporter.sendMail(mailData, function (err, info) {
+    if (err) {
+      console.log("Mail sent error");
+    } else {
+      console.log("mail send successfully");
+    }
+  });
+}
+
 function getProduct(count, data_count, since_id = 0) {
-  console.log(data_count, since_id);
+  console.log("data_count", count, data_count);
   const getProducts = new Promise((resolve, reject) => {
     Shopify.get(
       `/admin/products.json?limit=100&&since_id=${since_id}`,
@@ -113,9 +123,9 @@ function getProduct(count, data_count, since_id = 0) {
         count++;
         since_id = product.id;
       });
-      console.log(count);
+      console.log("count", count, data_count);
       if (count <= data_count) {
-        getProduct(data_count, since_id);
+        getProduct(count, data_count, since_id);
       } else {
         try {
           fs.writeFileSync("./public/csv/products.csv", product_csv_data);
@@ -141,19 +151,13 @@ function updateProductCsv() {
     console.log(data.count);
     getAllProducts(data.count);
   });
+  cronMail();
 }
 
 // Schedule the task to run every 4 hours
-cron.schedule("0 */4 * * *", updateProductCsv);
+// cron.schedule("0 */1 * * *", updateProductCsv);
 
-app.post("/csv-update", (req, res) => {
-  transporter.sendMail(mailData, function (err, info) {
-    if (err) {
-      console.log("Mail sent error");
-    } else {
-      console.log("mail send successfully");
-    }
-  });
+app.get("/csv-update", (req, res) => {
   updateProductCsv();
 });
 app.listen(port, () => {
