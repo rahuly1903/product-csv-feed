@@ -155,7 +155,7 @@ function updateProductCsv() {
 }
 
 // Schedule the task to run every 4 hours
-// cron.schedule("0 */1 * * *", updateProductCsv);
+cron.schedule("0 */4 * * *", updateProductCsv);
 
 app.post("/csv-update", (req, res) => {
   updateProductCsv();
